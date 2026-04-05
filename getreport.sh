@@ -28,4 +28,3 @@ echo -e "${RED}[🚨] Rogue Files Created:  $created${NC}"
 echo -e "${RED}[🗑️] Critical Files Wiped: $deleted${NC}"
 echo -e "${CYAN}========================================${NC}"
 echo "Run 'cat sentinelaudit.log' for full forensic details."
-
