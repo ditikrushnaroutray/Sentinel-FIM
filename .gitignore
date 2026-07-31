@@ -22,3 +22,7 @@ secrets.json
 .DS_Store
 *.swp
 *~
+
+# --- AI & Documentation ---
+# This file is for AI/local development context only.
+agent.md
