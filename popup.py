@@ -51,32 +51,80 @@ def show_ui(json_str):
         sys.exit(1)
         
     print("╔══════════════════════════════════════════════════════════╗")
-    print("║   🔴 SENTINEL: Suspicious Process Detected              ║")
-    print("║                                                         ║")
-    print(f"║   Process:   {data.get('name', 'Unknown')}".ljust(59) + "║")
-    print(f"║   PID:       {data.get('pid', 'Unknown')}".ljust(59) + "║")
-    print(f"║   Path:      {data.get('path', 'Unknown')}".ljust(59) + "║")
-    print(f"║   User:      {data.get('user', 'Unknown')}".ljust(59) + "║")
-    print(f"║   Time:      {data.get('time', 'Unknown')}".ljust(59) + "║")
-    print("║                                                         ║")
-    print("║   [a] Allow  [k] Kill  [i] Ignore once                 ║")
+    
+    event_type = data.get("type", "process")
+    score = data.get("score", "?")
+    
+    if event_type == "process":
+        print("║   🔴 SENTINEL: Suspicious Process Detected              ║")
+        print("║                                                         ║")
+        print(f"║   Process:   {data.get('name', 'Unknown')}".ljust(59) + "║")
+        print(f"║   PID:       {data.get('pid', 'Unknown')}".ljust(59) + "║")
+        print(f"║   Path:      {data.get('path', 'Unknown')}".ljust(59) + "║")
+        print(f"║   User:      {data.get('user', 'Unknown')}".ljust(59) + "║")
+        print(f"║   Threat:    {score}/10".ljust(59) + "║")
+        print(f"║   Time:      {data.get('time', 'Unknown')}".ljust(59) + "║")
+        print("║                                                         ║")
+        print("║   [a] Allow  [k] Kill  [i] Ignore once                 ║")
+    else:
+        print("║   ⚠️ SENTINEL: File Integrity Violation                 ║")
+        print("║                                                         ║")
+        print(f"║   File:      {data.get('path', 'Unknown')}".ljust(59) + "║")
+        print(f"║   Action:    {str(data.get('action', 'Unknown')).upper()}".ljust(59) + "║")
+        print(f"║   Threat:    {score}/10".ljust(59) + "║")
+        print(f"║   Time:      {data.get('time', 'Unknown')}".ljust(59) + "║")
+        print("║                                                         ║")
+        action = data.get('action', 'Unknown')
+        if action == "modified":
+            print("║   [a] Update Baseline                                  ║")
+            print("║   [d] Delete File                                      ║")
+        elif action == "created":
+            print("║   [a] Allow (add to baseline)                          ║")
+            print("║   [d] Delete File                                      ║")
+        else:
+            print("║   [a] Accept Deletion (update baseline)                ║")
+        print("║   [i] Ignore once                                      ║")
+        
     print("╚══════════════════════════════════════════════════════════╝")
     
     while True:
-        choice = input("Decision [a/k/i]: ").strip().lower()
-        if choice in ['a', 'k', 'i']:
-            decision = "allow" if choice == 'a' else "kill" if choice == 'k' else "ignore"
-            resp = json.dumps({"decision": decision, "pid": data.get("pid")})
-            try:
-                with open(PIPE_IN, "w") as pipe:
-                    pipe.write(resp + "\n")
-                    pipe.flush()
-            except Exception as e:
-                print("Failed to send decision:", e)
-                time.sleep(2)
-            break
+        if event_type == "process":
+            choice = input("Decision [a/k/i]: ").strip().lower()
+            if choice in ['a', 'k', 'i']:
+                decision = "allow" if choice == 'a' else "kill" if choice == 'k' else "ignore"
+                resp = {"decision": decision}
+                try:
+                    with open(PIPE_IN, "w") as pipe:
+                        pipe.write(json.dumps(resp) + "\n")
+                        pipe.flush()
+                except Exception as e:
+                    print("Failed to send decision:", e)
+                    time.sleep(2)
+                break
+            else:
+                print("Invalid choice.")
         else:
-            print("Invalid choice.")
+            action = data.get('action')
+            valid_choices = ['a', 'd', 'i'] if action in ['modified', 'created'] else ['a', 'i']
+            choice = input(f"Decision [{' / '.join(valid_choices)}]: ").strip().lower()
+            
+            if choice in valid_choices:
+                if choice == 'd':
+                    confirm = input("⚠️ Delete this file? (y/n): ").strip().lower()
+                    if confirm != 'y':
+                        continue
+                decision = "allow" if choice == 'a' else "delete" if choice == 'd' else "ignore"
+                resp = {"decision": decision}
+                try:
+                    with open(PIPE_IN, "w") as pipe:
+                        pipe.write(json.dumps(resp) + "\n")
+                        pipe.flush()
+                except Exception as e:
+                    print("Failed to send decision:", e)
+                    time.sleep(2)
+                break
+            else:
+                print("Invalid choice.")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
