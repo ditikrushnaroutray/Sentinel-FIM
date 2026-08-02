@@ -26,3 +26,8 @@ secrets.json
 # --- AI & Documentation ---
 # This file is for AI/local development context only.
 agent.md
+baseline.json
+config.toml
+anomalies.txt
+nohup.out
+sentinel_backup.py

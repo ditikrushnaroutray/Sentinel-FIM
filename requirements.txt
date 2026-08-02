@@ -1,2 +1,3 @@
-watchdog
+inotify-simple
 psutil
+requests
