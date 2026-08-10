@@ -66,24 +66,33 @@ def show_ui(json_str):
         print(f"║   Time:      {data.get('time', 'Unknown')}".ljust(59) + "║")
         print("║                                                         ║")
         print("║   [a] Allow  [k] Kill  [i] Ignore once                 ║")
+    elif event_type == "login":
+        print("║   🔴 SENTINEL: Brute-Force Attack Detected              ║")
+        print("║                                                         ║")
+        print(f"║   IP:        {data.get('ip', 'Unknown')}".ljust(59) + "║")
+        print(f"║   Attempts:  {data.get('attempts', 0)} failed logins in {data.get('window', 300)} seconds".ljust(59) + "║")
+        print(f"║   Service:   {data.get('service', 'ssh')}".ljust(59) + "║")
+        print(f"║   User:      {data.get('user', 'Unknown')}".ljust(59) + "║")
+        print("║                                                         ║")
+        print("║   [a] Allow  [b] Block IP  [i] Ignore once             ║")
+    elif event_type == "cron":
+        print("║   ⚠️ SENTINEL: Cron Job Change Detected                 ║")
+        print("║                                                         ║")
+        print(f"║   File:       {data.get('path', 'Unknown')}".ljust(59) + "║")
+        print(f"║   Event:      {str(data.get('action', 'Unknown')).capitalize()}".ljust(59) + "║")
+        print(f"║   User:       root".ljust(59) + "║")
+        print("║                                                         ║")
+        print("║   [a] Allow  [d] Delete  [i] Ignore once               ║")
     else:
         print("║   ⚠️ SENTINEL: File Integrity Violation                 ║")
         print("║                                                         ║")
-        print(f"║   File:      {data.get('path', 'Unknown')}".ljust(59) + "║")
-        print(f"║   Action:    {str(data.get('action', 'Unknown')).upper()}".ljust(59) + "║")
+        print(f"║   File:       {data.get('path', 'Unknown')}".ljust(59) + "║")
+        print(f"║   Event:      {str(data.get('action', 'Unknown')).capitalize()}".ljust(59) + "║")
+        print(f"║   User:       {data.get('user', 'Unknown')}".ljust(59) + "║")
         print(f"║   Threat:    {score}/10".ljust(59) + "║")
         print(f"║   Time:      {data.get('time', 'Unknown')}".ljust(59) + "║")
         print("║                                                         ║")
-        action = data.get('action', 'Unknown')
-        if action == "modified":
-            print("║   [a] Update Baseline                                  ║")
-            print("║   [d] Delete File                                      ║")
-        elif action == "created":
-            print("║   [a] Allow (add to baseline)                          ║")
-            print("║   [d] Delete File                                      ║")
-        else:
-            print("║   [a] Accept Deletion (update baseline)                ║")
-        print("║   [i] Ignore once                                      ║")
+        print("║   [a] Allow  [r] Revert  [d] Delete  [i] Ignore once   ║")
         
     print("╚══════════════════════════════════════════════════════════╝")
     
@@ -103,17 +112,58 @@ def show_ui(json_str):
                 break
             else:
                 print("Invalid choice.")
+        elif event_type == "login":
+            choice = input("Decision [a/b/i]: ").strip().lower()
+            if choice in ['a', 'b', 'i']:
+                decision = "allow" if choice == 'a' else "block" if choice == 'b' else "ignore"
+                resp = {"decision": decision}
+                try:
+                    with open(PIPE_IN, "w") as pipe:
+                        pipe.write(json.dumps(resp) + "\n")
+                        pipe.flush()
+                except Exception as e:
+                    print("Failed to send decision:", e)
+                    time.sleep(2)
+                break
+            else:
+                print("Invalid choice.")
+        elif event_type == "cron":
+            choice = input("Decision [a/d/i]: ").strip().lower()
+            if choice in ['a', 'd', 'i']:
+                if choice == 'd':
+                    confirm = input("⚠️ Delete this cron job? (y/n): ").strip().lower()
+                    if confirm != 'y':
+                        continue
+                decision = "allow" if choice == 'a' else "delete" if choice == 'd' else "ignore"
+                resp = {"decision": decision}
+                try:
+                    with open(PIPE_IN, "w") as pipe:
+                        pipe.write(json.dumps(resp) + "\n")
+                        pipe.flush()
+                except Exception as e:
+                    print("Failed to send decision:", e)
+                    time.sleep(2)
+                break
+            else:
+                print("Invalid choice.")
         else:
             action = data.get('action')
-            valid_choices = ['a', 'd', 'i'] if action in ['modified', 'created'] else ['a', 'i']
-            choice = input(f"Decision [{' / '.join(valid_choices)}]: ").strip().lower()
-            
+            valid_choices = ['a', 'r', 'd', 'i'] if action in ['modified', 'created'] else ['a', 'r', 'i']
+            choice = input(f"Decision [{'/'.join(valid_choices)}]: ").strip().lower()
             if choice in valid_choices:
                 if choice == 'd':
                     confirm = input("⚠️ Delete this file? (y/n): ").strip().lower()
                     if confirm != 'y':
                         continue
-                decision = "allow" if choice == 'a' else "delete" if choice == 'd' else "ignore"
+                if choice == 'r':
+                    decision = "revert"
+                elif choice == 'a':
+                    decision = "allow"
+                elif choice == 'd':
+                    decision = "delete"
+                else:
+                    decision = "ignore"
+                    
                 resp = {"decision": decision}
                 try:
                     with open(PIPE_IN, "w") as pipe:
